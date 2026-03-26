@@ -1,98 +1,246 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { triggerHaptic } from "@/app/utils/feedback";
+import CategoryPicker from "@/components/CategoryPicker";
+import ParallaxScrollView from "@/components/parallax-scroll-view";
+import { Toast } from "@/components/Toast";
+import { useTodos } from "@/context/_todo-context";
+import { Ionicons } from "@expo/vector-icons";
+import Fontisto from "@expo/vector-icons/Fontisto";
+import { Link } from "expo-router";
+import React, { useState } from "react";
+import {
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const {
+    todos,
+    addTodo,
+    toggleTodo,
+    updateTodo,
+    moveToBin,
+    categories,
+    assignCategory,
+  } = useTodos();
+  const [inputText, setInputText] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  const activeTodos = todos.filter((t) => !t.completed && !t.isDeleted);
+
+  const handleAdd = () => {
+    if (inputText.trim()) {
+      addTodo(inputText);
+      setInputText("");
+    }
+  };
+  const startEditing = (id: string, currentText: string) => {
+    setEditingId(id);
+    setEditText(currentText);
+  };
+  const saveEdit = () => {
+    if (editingId) {
+      updateTodo(editingId, editText);
+      setEditingId(null);
+    }
+  };
+  const handleMoveToBin = (id: string) => {
+    triggerHaptic("Heavy");
+    moveToBin(id);
+    setToastMsg("Moved to Bin");
+  };
+  const openPicker = (taskId: string) => {
+    setSelectedTaskId(taskId);
+    setPickerVisible(true);
+  };
+  const handleSelectCategory = (catId: string | null) => {
+    if (selectedTaskId) assignCategory(selectedTaskId, catId);
+    setPickerVisible(false);
+  };
+  const getCatColor = (catId?: string) => {
+    const cat = categories.find((c) => c.id === catId);
+    return cat ? cat.color : "transparent";
+  };
+
+  return (
+    <View style={{ flex: 1, backgroundColor: "#000" }}>
+      <ParallaxScrollView
+        headerBackgroundColor={{ light: "#D0D0D0", dark: "#353636" }}
+        headerImage={
+          <Fontisto
+            name="checkbox-passive"
+            size={250}
+            style={styles.headerImage}
+          />
+        }
+      >
+        <View style={styles.titleContainer}>
+          <Text style={{ fontSize: 32, fontWeight: "bold", color: "white" }}>
+            To-Do List:
+          </Text>
+
+          <View style={{ flexDirection: "row", gap: 15 }}>
+            {/* NEW: Link to the Bin */}
+            <Link href="/bin" asChild>
+              <TouchableOpacity>
+                <Ionicons name="trash-bin" size={24} color="#FF5252" />
+              </TouchableOpacity>
+            </Link>
+
+            {/* Existing Links */}
+            <Link href="/_search" asChild>
+              <TouchableOpacity>
+                <Ionicons name="search" size={24} color="#A1CEDC" />
+              </TouchableOpacity>
+            </Link>
+            <Link href="/_categories" asChild>
+              <TouchableOpacity>
+                <Ionicons name="grid" size={24} color="#A1CEDC" />
+              </TouchableOpacity>
+            </Link>
+          </View>
+        </View>
+
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Add a new task..."
+            placeholderTextColor="#888"
+            value={inputText}
+            onChangeText={setInputText}
+          />
+          <TouchableOpacity onPress={handleAdd}>
+            <Ionicons name="add-circle" size={48} color="#A1CEDC" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.listContainer}>
+          {activeTodos.map((item) => (
+            <View key={item.id} style={styles.taskItem}>
+              <TouchableOpacity onPress={() => toggleTodo(item.id)}>
+                <Ionicons name="square-outline" size={24} color="#aaa" />
+              </TouchableOpacity>
+              {editingId === item.id ? (
+                <View
+                  style={{
+                    flex: 1,
+                    flexDirection: "row",
+                    alignItems: "center",
+                  }}
+                >
+                  <TextInput
+                    style={styles.editInput}
+                    value={editText}
+                    onChangeText={setEditText}
+                    autoFocus
+                  />
+                  <TouchableOpacity onPress={saveEdit}>
+                    <Ionicons name="checkmark" size={24} color="#4CAF50" />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={{
+                    flex: 1,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                  onPress={() => startEditing(item.id, item.text)}
+                >
+                  {item.categoryId && (
+                    <View
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 4,
+                        backgroundColor: getCatColor(item.categoryId),
+                      }}
+                    />
+                  )}
+                  <Text style={styles.taskText}>{item.text}</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                onPress={() => openPicker(item.id)}
+                style={{ padding: 5 }}
+              >
+                <Ionicons
+                  name={item.categoryId ? "pricetag" : "pricetag-outline"}
+                  size={20}
+                  color={
+                    item.categoryId ? getCatColor(item.categoryId) : "#666"
+                  }
+                />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleMoveToBin(item.id)}>
+                <Ionicons name="trash-outline" size={22} color="#FF5252" />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+      </ParallaxScrollView>
+      {toastMsg && (
+        <Toast message={toastMsg} onHide={() => setToastMsg(null)} />
+      )}
+      <CategoryPicker
+        visible={pickerVisible}
+        onClose={() => setPickerVisible(false)}
+        onSelect={handleSelectCategory}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingRight: 10,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 20,
+    gap: 10,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  input: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 10,
+    color: "#FFFFFF",
+    backgroundColor: "#333",
+  },
+  listContainer: { gap: 10 },
+  taskItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 15,
+    backgroundColor: "#2A2A2A",
+    borderRadius: 10,
+    gap: 12,
+  },
+  taskText: { fontSize: 16, color: "white" },
+  editInput: {
+    flex: 1,
+    color: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#A1CEDC",
+    marginHorizontal: 10,
+  },
+  headerImage: {
+    color: "#808080",
+    bottom: -90,
+    left: -35,
+    position: "absolute",
   },
 });
